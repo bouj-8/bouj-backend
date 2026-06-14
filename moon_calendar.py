@@ -367,6 +367,44 @@ def lunar_date(local_dt: datetime) -> tuple[int, bool, int]:
     raise RuntimeError("Could not match new moon to a month in the suì")
 
 
+def gate_readings(nm, tz) -> tuple[tuple[int, bool, int], tuple[int, bool, int]]:
+    """Return (closing, opening) lunar date tuples for a gate day new moon.
+
+    Derives both readings directly from the suì — no hour offsets needed.
+    Opening is always day 1 by definition. Closing day is the gate day itself
+    counted from when that month started.
+    """
+    nm_local = _dt_from_time(nm, tz)
+    utc_dt   = nm_local.astimezone(timezone.utc)
+    _, assignments = _locate_sui(nm, utc_dt.year)
+
+    opening_idx = next(
+        (i for i, (nm_start, _, _, _) in enumerate(assignments)
+         if abs(nm_start.tt - nm.tt) < 0.01),
+        None,
+    )
+    if opening_idx is None:
+        raise RuntimeError("Could not find opening month for gate day")
+
+    open_num, open_leap = assignments[opening_idx][2], assignments[opening_idx][3]
+    opening = (open_num, open_leap, 1)
+
+    if opening_idx > 0:
+        close_start, _, close_num, close_leap = assignments[opening_idx - 1]
+    else:
+        # Opening is month 11 (first of suì) — closing is the last month of the previous suì
+        prev_m11      = _month_11_start_for(utc_dt.year - 2)
+        prev_m11_next = _month_11_start_for(utc_dt.year - 1)
+        prev_assign   = _assign_months(_build_sui(prev_m11, prev_m11_next))
+        close_start, _, close_num, close_leap = prev_assign[-1]
+
+    close_start_local = _dt_from_time(close_start, tz)
+    close_day = (nm_local.date() - close_start_local.date()).days + 1
+    closing = (close_num, close_leap, min(30, max(1, close_day)))
+
+    return closing, opening
+
+
 # ── audit (--audit) ─────────────────────────────────────────────────────────
 
 def print_sui_audit(now: datetime) -> None:
@@ -494,9 +532,8 @@ def print_details(now: datetime) -> None:
 
 # ── UI ───────────────────────────────────────────────────────────────────────
 
-def _format_gate_day(nm_local: datetime, tz) -> str:
-    m_b, l_b, d_b = lunar_date(nm_local - timedelta(hours=1))
-    m_a, l_a, d_a = lunar_date(nm_local + timedelta(hours=1))
+def _format_gate_day(nm, tz) -> str:
+    (m_b, l_b, d_b), (m_a, l_a, d_a) = gate_readings(nm, tz)
     closing = ("leap " if l_b else "") + f"{month_to_words(m_b)} moon day {day_to_words(d_b)}"
     opening = ("leap " if l_a else "") + f"{month_to_words(m_a)} moon day {day_to_words(d_a)}"
     return f"gate day — {closing} / {opening}"
@@ -544,7 +581,7 @@ def other_date_menu(config: dict) -> None:
     nm = _gate_new_moon(date_obj, tz)
     if nm is not None:
         nm_local = _dt_from_time(nm, tz)
-        print(bold(_format_gate_day(nm_local, tz)))
+        print(bold(_format_gate_day(nm, tz)))
         print()
         print(f"@ {loc['name']}, {date_obj.strftime('%B %-d, %Y')}")
         print(f"new moon at {_fmt_time(nm_local)}")

@@ -121,8 +121,7 @@ def get_moon(
     nm = mc._gate_new_moon(date_obj, tz)
     if nm is not None:
         nm_local = mc._dt_from_time(nm, tz)
-        m_b, l_b, d_b = mc.lunar_date(nm_local - timedelta(hours=1))
-        m_a, l_a, d_a = mc.lunar_date(nm_local + timedelta(hours=1))
+        (m_b, l_b, d_b), (m_a, l_a, d_a) = mc.gate_readings(nm, tz)
         return MoonResponse(
             date=date_obj.isoformat(),
             is_gate_day=True,
