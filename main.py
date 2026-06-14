@@ -2,11 +2,19 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import FastAPI, Query, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 import moon_calendar as mc
 
 app = FastAPI(title="bouj moon calendar")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
 
 
 # ── response models ──────────────────────────────────────────────────────────
