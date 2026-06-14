@@ -6,7 +6,7 @@
 
 `~/.local/bin/moon` is a symlink to `moon_calendar.py` — run `moon` from anywhere in the terminal.
 
-The FastAPI server is deployed on Railway, connected to `github.com/bouj-8/bouj-backend`. Every push to `main` triggers an automatic redeploy. The next milestone is building out `bouj-site` to consume the API.
+The FastAPI server is deployed on Railway, connected to `github.com/bouj-8/bouj-backend`. Every push to `main` triggers an automatic redeploy. The frontend (`bouj-site`) is live and consuming the API.
 
 ---
 
@@ -111,8 +111,20 @@ Config is stored at `~/.config/moon-calendar/config.json`.
 
 ---
 
+## Gate day readings (`gate_readings`)
+
+Gate day closing/opening are derived directly from the suì — no hour offsets. `gate_readings(nm, tz)` returns `(closing, opening)` as `(month_num, is_leap, day_num)` tuples:
+
+- **Opening**: always day 1 by definition — looked up directly from the suì
+- **Closing**: gate day counted from that month's start date
+
+Do not revert to `lunar_date(nm ± timedelta(hours=1))` — it causes wrong day numbers when new moons fall near local midnight.
+
+---
+
 ## What NOT to do
 
 - Do not add Beijing-time (CST/UTC+8) rounding to zhōngqì membership — it breaks location independence and is contrary to the core design.
 - Do not use `if skyfield_time:` — skyfield `Time` objects raise `TypeError` on truthiness tests. Always check `if t is not None:`.
 - Do not commit the ephemeris file (`de421.bsp`) — it is ~17 MB and cached at `~/.cache/skyfield`, not in the repo.
+- Do not use `lunar_date(nm ± timedelta(hours=1))` for gate day readings — use `gate_readings(nm, tz)` instead.
