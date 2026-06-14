@@ -2,9 +2,11 @@
 
 ## Project overview
 
-`moon_calendar.py` is a CLI lunar calendar that computes Chinese lunisolar dates from exact astronomical timestamps using the **skyfield** library. It is the core logic that will be wrapped in a FastAPI service.
+`moon_calendar.py` is a CLI lunar calendar that computes Chinese lunisolar dates from exact astronomical timestamps using the **skyfield** library. It is also the core logic behind the FastAPI service in `main.py`.
 
-The next major milestone is the **FastAPI wrapper** — exposing `lunar_date()` and gate-day detection as HTTP endpoints.
+`~/.local/bin/moon` is a symlink to `moon_calendar.py` — run `moon` from anywhere in the terminal.
+
+The FastAPI server is deployed on Railway, connected to `github.com/bouj-8/bouj-backend`. Every push to `main` triggers an automatic redeploy. The next milestone is building out `bouj-site` to consume the API.
 
 ---
 
@@ -61,15 +63,36 @@ A month is a leap month if no zhōngqì (major solar marker, sun at a multiple o
 
 ---
 
+## API endpoints (`main.py`)
+
+| Endpoint | Params | Returns |
+|---|---|---|
+| `GET /moon` | `lat`, `lon`, `date?` (YYYY-MM-DD), `phases?` (bool) | lunar date or gate day reading |
+| `GET /moon/audit` | `lat`, `lon` | full suì table with zhōngqì mapping |
+
+On a gate day, `reading` is null and `gate` is populated with `closing` and `opening` readings plus the exact new moon timestamp.
+
+Start locally: `uvicorn main:app --reload`
+
+## Deployment
+
+Hosted on Railway. `Procfile` sets the start command:
+```
+web: uvicorn main:app --host 0.0.0.0 --port $PORT
+```
+`$PORT` is assigned by Railway at runtime. No env vars required — the app has no secrets.
+
+The ephemeris file (`de421.bsp`) is downloaded automatically by skyfield on first request (~17 MB, then cached on the server).
+
 ## Dependencies
 
 ```
 skyfield          # astronomy (de421.bsp ephemeris, cached at ~/.cache/skyfield)
 timezonefinder    # lat/lon → IANA timezone name
 pytz              # timezone objects for localize()
+fastapi           # web framework
+uvicorn           # ASGI server
 ```
-
-FastAPI deps will be added when the wrapper is built.
 
 ---
 
