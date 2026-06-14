@@ -1,0 +1,86 @@
+.TH MOON 1 "2026-06-06" "moon-calendar" "User Commands"
+.SH NAME
+moon \- display today's lunar date
+.SH SYNOPSIS
+.B moon
+.RI [ option ]
+.SH DESCRIPTION
+Displays the current lunar date in natural language, e.g.
+.IR "fourth moon day twenty\-two" .
+.PP
+The lunar year follows the Chinese calendar system: the first moon begins
+on the second new moon after the winter solstice. Lunar days are anchored
+to local calendar dates, so the new moon's day is always day one regardless
+of the hour it occurs, and daylight saving time is accounted for
+automatically.
+.PP
+On first run, the program asks for a location name and coordinates.
+The location is used to determine the local timezone for accurate day
+counting. Up to nine locations are saved in order of most recently used.
+.SH OPTIONS
+.TP
+.B \-o
+Look up the lunar date for any date other than today. First shows the
+location menu so the correct timezone is confirmed, then prompts for a
+Gregorian calendar date in any common format (e.g.
+.IR "2024-01-15" ,
+.IR "Jan 15, 2024" ,
+.IR "15 Jan 2024" ).
+Dates from year 1 to 9999 CE are supported.
+.TP
+.B \-d
+Print a plain-English lunar phase summary alongside the date. Reports
+up to three things: any major phase that occurred in the past 36 hours
+(e.g.
+.IR "The full moon was yesterday at 11:42pm." ),
+the next upcoming major phase with its day and time, and the next full
+or new moon by day count \(em omitting the last item when it duplicates
+the second. The four major phases are new moon, first quarter, full
+moon, and last quarter. All times are in the local timezone derived from
+the saved coordinates.
+.TP
+.B \-l
+Open the location menu. Shows saved locations numbered 1\(en9 in
+most-recently-used order. Enter a number to switch to that location,
+.B 0
+to add a new one, or
+.B x
+to delete a location.
+.TP
+.B \-r
+Reset all saved locations. The next run will prompt for a new location.
+.TP
+.B \-h ", " \-\-help
+Print a short summary of available commands and exit.
+.SH FILES
+.TP
+.I ~/.config/moon-calendar/config.json
+Saved locations in most-recently-used order.
+.TP
+.I ~/.local/bin/moon
+Symlink to the script.
+.SH EXAMPLES
+Show today's lunar date:
+.RS
+.B moon
+.RE
+.PP
+Show lunar date with phase details:
+.RS
+.B moon \-d
+.RE
+.PP
+Look up the lunar date for a past or future date:
+.RS
+.B moon \-o
+.RE
+.PP
+Switch or add a location:
+.RS
+.B moon \-l
+.RE
+.PP
+Clear all saved locations:
+.RS
+.B moon \-r
+.RE
