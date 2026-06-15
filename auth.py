@@ -6,7 +6,9 @@ from pathlib import Path
 import bcrypt
 import jwt
 
-_SECRET = os.environ.get("JWT_SECRET", "dev-secret-not-for-production")
+_SECRET = os.environ.get("JWT_SECRET")
+if not _SECRET:
+    raise RuntimeError("JWT_SECRET environment variable is not set")
 _ALGORITHM = "HS256"
 _EXPIRE_HOURS = 24
 
