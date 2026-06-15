@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -7,15 +8,21 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 import auth
-
+import db
 import moon_calendar as mc
 
-app = FastAPI(title="bouj moon calendar")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db.init_db()
+    yield
+
+app = FastAPI(title="bouj moon calendar", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET", "POST"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -81,6 +88,25 @@ class AuthResponse(BaseModel):
 
 class MeResponse(BaseModel):
     username: str
+
+
+class PostResponse(BaseModel):
+    id: int
+    title: str
+    body: str
+    author: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+class PostCreate(BaseModel):
+    title: str
+    body: str
+
+
+class PostUpdate(BaseModel):
+    title: Optional[str] = None
+    body: Optional[str] = None
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -210,3 +236,53 @@ def get_me(creds: HTTPAuthorizationCredentials = Depends(_bearer)):
     except Exception:
         raise HTTPException(status_code=401, detail="invalid or expired token")
     return MeResponse(username=username)
+
+
+# ── posts ─────────────────────────────────────────────────────────────────────
+
+_WRITERS = {"admin"}
+
+
+def _require_auth(creds: HTTPAuthorizationCredentials) -> str:
+    try:
+        return auth.decode_token(creds.credentials)
+    except Exception:
+        raise HTTPException(status_code=401, detail="invalid or expired token")
+
+
+@app.get("/posts", response_model=list[PostResponse])
+def list_posts(creds: HTTPAuthorizationCredentials = Depends(_bearer)):
+    _require_auth(creds)
+    return db.get_posts()
+
+
+@app.post("/posts", response_model=PostResponse, status_code=201)
+def create_post(data: PostCreate, creds: HTTPAuthorizationCredentials = Depends(_bearer)):
+    username = _require_auth(creds)
+    if username not in _WRITERS:
+        raise HTTPException(status_code=403, detail="not authorized to write posts")
+    return db.create_post(data.title, data.body, username)
+
+
+@app.patch("/posts/{post_id}", response_model=PostResponse)
+def update_post(post_id: int, data: PostUpdate, creds: HTTPAuthorizationCredentials = Depends(_bearer)):
+    username = _require_auth(creds)
+    if username not in _WRITERS:
+        raise HTTPException(status_code=403, detail="not authorized to edit posts")
+    existing = db.get_post(post_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="post not found")
+    return db.update_post(
+        post_id,
+        data.title if data.title is not None else existing["title"],
+        data.body  if data.body  is not None else existing["body"],
+    )
+
+
+@app.delete("/posts/{post_id}", status_code=204)
+def delete_post(post_id: int, creds: HTTPAuthorizationCredentials = Depends(_bearer)):
+    username = _require_auth(creds)
+    if username not in _WRITERS:
+        raise HTTPException(status_code=403, detail="not authorized to delete posts")
+    if not db.delete_post(post_id):
+        raise HTTPException(status_code=404, detail="post not found")
