@@ -65,10 +65,12 @@ A month is a leap month if no zhōngqì (major solar marker, sun at a multiple o
 
 ## API endpoints (`main.py`)
 
-| Endpoint | Params | Returns |
+| Endpoint | Body / Params | Returns |
 |---|---|---|
 | `GET /moon` | `lat`, `lon`, `date?` (YYYY-MM-DD), `phases?` (bool) | lunar date or gate day reading |
 | `GET /moon/audit` | `lat`, `lon` | full suì table with zhōngqì mapping |
+| `POST /auth` | `{ "password": "..." }` | `{ "token": "...", "username": "..." }` |
+| `GET /me` | `Authorization: Bearer <token>` | `{ "username": "..." }` |
 
 On a gate day, `reading` is null and `gate` is populated with `closing` and `opening` readings plus the exact new moon timestamp.
 
@@ -80,9 +82,29 @@ Hosted on Railway. `Procfile` sets the start command:
 ```
 web: uvicorn main:app --host 0.0.0.0 --port $PORT
 ```
-`$PORT` is assigned by Railway at runtime. No env vars required — the app has no secrets.
+
+**Required environment variable (set in Railway dashboard):**
+- `JWT_SECRET` — secret key used to sign and verify JWT tokens. Generate with `python3 -c "import secrets; print(secrets.token_hex(32))"`. Keep a backup copy outside Railway. Changing it invalidates all active tokens (logs everyone out).
 
 The ephemeris file (`de421.bsp`) is downloaded automatically by skyfield on first request (~17 MB, then cached on the server).
+
+## Auth files
+
+| File | Purpose |
+|---|---|
+| `auth.py` | bcrypt password checking, JWT creation/decoding |
+| `manage_users.py` | CLI to add/remove/list users |
+| `users.json` | username → bcrypt hash map; committed to repo so Railway picks it up |
+
+**Managing users:**
+```
+python3 manage_users.py add <username> <password>
+python3 manage_users.py remove <username>
+python3 manage_users.py list
+```
+After adding or removing a user, commit `users.json` and push to deploy the change.
+
+Passwords are unique per user — the password alone identifies who is logging in (no username field on the frontend). Tokens expire after 24 hours.
 
 ## Dependencies
 
@@ -92,6 +114,8 @@ timezonefinder    # lat/lon → IANA timezone name
 pytz              # timezone objects for localize()
 fastapi           # web framework
 uvicorn           # ASGI server
+bcrypt            # password hashing
+PyJWT             # JWT token creation and verification
 ```
 
 ---
@@ -128,3 +152,4 @@ Do not revert to `lunar_date(nm ± timedelta(hours=1))` — it causes wrong day 
 - Do not use `if skyfield_time:` — skyfield `Time` objects raise `TypeError` on truthiness tests. Always check `if t is not None:`.
 - Do not commit the ephemeris file (`de421.bsp`) — it is ~17 MB and cached at `~/.cache/skyfield`, not in the repo.
 - Do not use `lunar_date(nm ± timedelta(hours=1))` for gate day readings — use `gate_readings(nm, tz)` instead.
+- Do not store plain-text passwords anywhere — always bcrypt hash them via `manage_users.py`.
