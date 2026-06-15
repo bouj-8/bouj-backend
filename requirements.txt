@@ -3,3 +3,5 @@ timezonefinder
 pytz
 fastapi
 uvicorn
+bcrypt
+PyJWT

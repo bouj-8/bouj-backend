@@ -1,9 +1,12 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
+
+import auth
 
 import moon_calendar as mc
 
@@ -12,7 +15,7 @@ app = FastAPI(title="bouj moon calendar")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -65,6 +68,19 @@ class AuditResponse(BaseModel):
     sui_end_utc: str
     month_count: int
     months: list[AuditMonth]
+
+
+class AuthRequest(BaseModel):
+    password: str
+
+
+class AuthResponse(BaseModel):
+    token: str
+    username: str
+
+
+class MeResponse(BaseModel):
+    username: str
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -172,3 +188,25 @@ def get_audit(
         month_count=len(sui),
         months=months,
     )
+
+
+# ── auth ─────────────────────────────────────────────────────────────────────
+
+_bearer = HTTPBearer()
+
+
+@app.post("/auth", response_model=AuthResponse)
+def post_auth(body: AuthRequest):
+    username = auth.authenticate(body.password)
+    if not username:
+        raise HTTPException(status_code=401, detail="invalid password")
+    return AuthResponse(token=auth.create_token(username), username=username)
+
+
+@app.get("/me", response_model=MeResponse)
+def get_me(creds: HTTPAuthorizationCredentials = Depends(_bearer)):
+    try:
+        username = auth.decode_token(creds.credentials)
+    except Exception:
+        raise HTTPException(status_code=401, detail="invalid or expired token")
+    return MeResponse(username=username)
